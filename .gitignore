@@ -1,0 +1,6 @@
+*.hi
+*.o
+*.tix
+.cabal-sandbox
+cabal.*
+dist*

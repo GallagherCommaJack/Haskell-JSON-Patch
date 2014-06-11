@@ -1,0 +1,15 @@
+* Patch Parser
+  - Aeson
+  - Patch {op :: Text, path :: Text, from :: Maybe Text, value :: Maybe Text} deriving (Data, Typeable)
+* Data Parser
+  - Aeson
+  - Traverse the AST or use a heterogenous list type?
+  - Heterogenous list should probably get turned into a tree
+    - Manually traverse the tree or turn it into a Map instead?
+* Data Transformer
+  - MapPatch
+    - Already Implemented
+  - TreePatch
+    - Need to implement
+* Writing Changes
+  - I think Aeson has a thing for converting from data to JSON text
