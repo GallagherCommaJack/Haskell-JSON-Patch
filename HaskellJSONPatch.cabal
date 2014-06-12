@@ -16,13 +16,17 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     MapPatch,
-                       ParsePatch
+                       ParsePatch,
+                       AST
+
   extensions:          OverloadedStrings,
                        UnicodeSyntax
 
   -- other-modules:       
   build-depends:       base ==4.6.*,
                        containers,
+                       unordered-containers,
+                       vector,
                        text,
                        bytestring,
                        aeson ==0.7.*

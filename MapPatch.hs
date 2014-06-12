@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module MapPatch where
-import Data.Text hiding (copy, replace)
+import Data.Text.Lazy (Text(..), unpack)
+import qualified Data.Text.Lazy as T hiding (copy, replace)
 import qualified Data.Map as M
 type Path = Text
 
@@ -16,7 +17,7 @@ data Operation = Add Path Text
 add :: Path -> Text -> Paths -> Paths
 add path val paths = case M.lookup path paths of
   Nothing -> M.insert path val paths
-  Just pval -> error $ unpack $ Data.Text.unlines ["JSON Patch Error: Tried to insert:",
+  Just pval -> error $ unpack $ T.unlines ["JSON Patch Error: Tried to insert:",
                                                   val,
                                                   "At path:",
                                                   path,
@@ -29,7 +30,7 @@ remove = M.delete
 copy :: Path -> Path -> Paths -> Paths
 copy from path paths = case M.lookup from paths of
   Just val -> add path val paths
-  Nothing -> error $ unpack $ Data.Text.unlines
+  Nothing -> error $ unpack $ T.unlines
    ["JSON Patch Error: Couldn't find path:",
     from,
     "to move to:",
@@ -52,7 +53,7 @@ applyOp (Move from path) = move from path
 applyOp (Replace path val) = replace path val
 applyOp (Test path val) = \paths -> if test path val paths
                                    then paths
-                                   else error $ unpack $ Data.Text.unlines
+                                   else error $ unpack $ T.unlines
                                         ["JSON Patch Error: Wrong value at path:",
                                          path,
                                          "Expected:",

@@ -3,12 +3,15 @@ module ParsePatch
         parsePatch
        )
        where
-import Data.String (IsString(..))
+
 import Data.Maybe (fromJust)
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad (mzero)
+
 import qualified Data.ByteString.Lazy.Char8 as BS
-import qualified Data.Text                  as T
+import qualified Data.Text.Lazy             as T
+import qualified Data.Text.Lazy.Encoding    as T
+
 import Data.Aeson
 
 data Patch = Patch { op :: T.Text,
@@ -43,7 +46,7 @@ jsonTest = BS.pack $ "{ \"op\" : \"add\", \"path\" : \"/derp\"" ++
                      ", \"value\" : \"derp\" }"
 
 parsePatch :: T.Text -> Maybe Patch
-parsePatch = decode . BS.pack . T.unpack
+parsePatch = decode . T.encodeUtf8
 --
 patchFile :: String -> IO [Patch]
 patchFile file = fromJust <$> decode <$> BS.readFile file
