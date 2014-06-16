@@ -17,7 +17,9 @@ cabal-version:       >=1.8
 library
   exposed-modules:     MapPatch,
                        ParsePatch,
-                       AST
+                       AST,
+                       ParseTree,
+                       TreePatch
 
   extensions:          OverloadedStrings,
                        UnicodeSyntax
