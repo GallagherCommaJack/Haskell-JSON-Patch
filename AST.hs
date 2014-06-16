@@ -15,7 +15,7 @@ import qualified Data.Text.Internal         as Strict (Text(..))
 import qualified Data.HashMap.Strict        as Strict
 
 import Data.Aeson
-o
+
 data AST = Field T.Text T.Text | Dir T.Text [AST] deriving (Show, Read, Eq)
 
 parseDirsToMap :: T.Text -> Maybe (M.Map T.Text T.Text)
