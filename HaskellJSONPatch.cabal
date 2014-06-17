@@ -31,4 +31,5 @@ library
                        vector,
                        text,
                        bytestring,
+                       attoparsec,
                        aeson ==0.7.*
