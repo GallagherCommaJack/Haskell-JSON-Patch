@@ -1,9 +1,9 @@
 module TreePatch where
 
-import Data.Tree
+import Data.Tree (Tree(..), rootLabel)
 import Control.Arrow (first, second)
 import Control.Applicative ((<$>), (<*>))
-import Data.Monoid
+import Data.Monoid ((<>), mconcat)
 import Data.Text.Lazy (Text(..), unpack)
 import qualified Data.Text.Lazy as T hiding (copy, replace)
 
@@ -31,7 +31,7 @@ toPath :: Text -> Path
 toPath = T.split (=='/')
 
 fromPath :: Path -> Text
-fromPath = T.concat . fmap (flip T.snoc '/')
+fromPath = mconcat . fmap (flip T.snoc '/')
 
 findAndDeleteAtPath :: Path -> Tree Text -> (Maybe (Tree Text),Tree Text)
 findAndDeleteAtPath (x:xs) tr@(Node i ts) = case (xs,findInForest x ts) of
@@ -47,7 +47,7 @@ patch (Add (x:xs) val) tr@(Node i ts) = case (xs,findInForest x ts) of
   ([],(Nothing, _))  -> Right $ Node x $ leaf val : ts
   (_, (Just n, tts)) -> Node i <$> (:tts) <$> patch (Add xs val) n
   (_, (Nothing, _))  -> Right tr
-patch (Add [] val) (Node i ts) = Right $ Node i [leaf val]
+patch (Add [] val) (Node i ts) = Right $ leaf val
 
 patch (Rem []) (Node i ts) = Right $ leaf i
 patch (Rem xs) tr = Right $ snd $ findAndDeleteAtPath xs tr
