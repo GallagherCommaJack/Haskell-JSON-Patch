@@ -15,11 +15,8 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 library
-  exposed-modules:     MapPatch,
-                       ParsePatch,
-                       AST,
-                       ParseTree,
-                       TreePatch
+  exposed-modules:     ParsePatch,
+                       ValuePatch
 
   extensions:          OverloadedStrings,
                        UnicodeSyntax
