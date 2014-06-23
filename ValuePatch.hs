@@ -45,6 +45,7 @@ findAtPath (k:ks) (Object h) = HM.lookup k h >>= findAtPath ks
 findAtPath [] a = Just a
 
 addAtPath :: Path -> Value -> Value -> Maybe Value
+addAtPath [p] v (Object h) = Just $ Object $ HM.insert p v h
 addAtPath (p:ps) v obj = do
   (sub, (Object rest)) <- findAndDelete [p] obj
   patched <- addAtPath ps v sub
@@ -59,6 +60,15 @@ maybeToEither (Just a) = Right a
 maybeToEither Nothing = Left "Nothing"
 
 patch :: Operation -> Value -> Either Text Value
+patch (Add [] v)  _   = Right v
+patch (Rem [])    _   = Left "Tried to delete whole file - use rm instead"
+patch (Cop [] p2) obj = patch (Add p2 obj) obj
+patch (Mov [] _)  _   = Left "Can't move whole document to subdirectory of document!"
+patch (Rep [] v)  _   = Right v
+patch (Tes [] v)  obj = if v == obj then Right obj
+                          else Left $ "Value at path / is "
+                               <> objToText obj <> " not " <> objToText v
+
 patch (Add p v) obj = case addAtPath p v obj of
   Just a -> Right a
   Nothing -> Left $ "Couldn't traverse path " <> fromPath p

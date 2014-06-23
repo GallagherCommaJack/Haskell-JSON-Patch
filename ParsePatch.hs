@@ -8,7 +8,7 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Monad (mzero, join)
 
 import Data.Text (Text(..))
-import qualified Data.Text          as T (split)
+import qualified Data.Text          as T (split, tail, findIndex)
 import qualified Data.Text.Encoding as T (encodeUtf8)
 
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString(..), pack, readFile)
@@ -42,7 +42,8 @@ parsePatchFile file = do
 type Path = [Text]
 
 toPath :: Text -> Path
-toPath = T.split (=='/')
+toPath t | T.findIndex (=='/') t == Just 0  = T.split (=='/') $ T.tail t
+         | otherwise = T.split (=='/') t
 
 data Operation = Add Path Value
                | Rem Path
@@ -50,11 +51,12 @@ data Operation = Add Path Value
                | Mov Path Path
                | Rep Path Value
                | Tes Path Value
+               deriving (Show)
 
 patchToOp p = case op p of
   "add"     -> value p >>= return . Add (toPath $ path p)
   "replace" -> value p >>= return . Rep (toPath $ path p)
   "test"    -> value p >>= return . Tes (toPath $ path p)
-  "copy"    -> from p >>= return . flip Cop (toPath $ path p) . toPath
-  "move"    -> from p >>= return . flip Mov (toPath $ path p) . toPath
+  "copy"    -> from p >>= return . flip Cop (tail $ toPath $ path p) . toPath
+  "move"    -> from p >>= return . flip Mov (tail $ toPath $ path p) . toPath
   "remove"  -> Just $ Rem $ toPath $ path p
