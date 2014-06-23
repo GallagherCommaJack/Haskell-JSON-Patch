@@ -23,10 +23,20 @@ library
 
   -- other-modules:       
   build-depends:       base ==4.6.*,
-                       containers,
                        unordered-containers,
                        vector,
                        text,
                        bytestring,
-                       attoparsec,
+                       aeson ==0.7.*
+
+executable patch
+  main-is:             Main.hs
+  extensions:          OverloadedStrings, UnicodeSyntax
+  other-modules:       ParsePatch,
+                       ValuePatch
+  build-depends:       base ==4.6.*,
+                       unordered-containers,
+                       vector,
+                       text,
+                       bytestring,
                        aeson ==0.7.*
