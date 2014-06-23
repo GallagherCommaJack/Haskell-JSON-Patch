@@ -3,6 +3,7 @@ module ValuePatch (patch
                   )
        where
 
+import Data.List (foldl')
 
 import Data.Aeson (Value(..))
 
@@ -84,3 +85,6 @@ patch (Tes p t) obj = case findAtPath p obj of
                else Left $ "Value at path " <> fromPath p <> " is "
                     <> objToText v <> " not " <> objToText t
   Nothing -> Left $ "Couldn't find value at path " <> fromPath p
+
+applyPatches :: [Operation] -> Value -> Either Text Value
+applyPatches ops v = foldl' (>>=) (Right v) $ map patch ops

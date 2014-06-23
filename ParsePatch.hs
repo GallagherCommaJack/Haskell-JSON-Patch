@@ -29,3 +29,32 @@ instance FromJSON Patch where
                          v .:? "value"
   parseJSON _ = mzero
 
+
+parsePatchFile :: String -> IO [Operation]
+parsePatchFile file = do
+  parsed <- decode <$> BS.readFile file
+  let ops = join $ sequence <$> map patchToOp <$> parsed
+  case ops of
+    (Just xs) -> return xs
+    Nothing -> error $ "File " <> file <> " contains invalid patches"
+--Conversion to operations
+
+type Path = [Text]
+
+toPath :: Text -> Path
+toPath = T.split (=='/')
+
+data Operation = Add Path Value
+               | Rem Path
+               | Cop Path Path
+               | Mov Path Path
+               | Rep Path Value
+               | Tes Path Value
+
+patchToOp p = case op p of
+  "add"     -> value p >>= return . Add (toPath $ path p)
+  "replace" -> value p >>= return . Rep (toPath $ path p)
+  "test"    -> value p >>= return . Tes (toPath $ path p)
+  "copy"    -> from p >>= return . flip Cop (toPath $ path p) . toPath
+  "move"    -> from p >>= return . flip Mov (toPath $ path p) . toPath
+  "remove"  -> Just $ Rem $ toPath $ path p
