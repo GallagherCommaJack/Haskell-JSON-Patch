@@ -1,4 +1,8 @@
-module ValuePatch where
+module ValuePatch (patch
+                  ,applyPatches
+                  )
+       where
+
 
 import Data.Aeson (Value(..))
 
@@ -7,21 +11,14 @@ import Data.Monoid ((<>), mconcat)
 
 import Data.Text (Text(..))
 
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as Lazy
+import qualified Data.Text as T (pack, snoc)
 
 import Data.HashMap.Strict (HashMap(..))
-import qualified Data.HashMap.Strict as HM
+import qualified Data.HashMap.Strict as HM (lookup, insert, delete, adjust)
+
+import ParsePatch (Operation(..))
 
 type Path = [Text]
-
-data Operation = Add Path Value
-               | Rem Path
-               | Cop Path Path
-               | Mov Path Path
-               | Rep Path Value
-               | Tes Path Value
-               deriving (Show, Eq)
 
 objToText :: Value -> Text
 objToText (Object o) = T.pack $ show o
@@ -52,9 +49,6 @@ addAtPath (p:ps) v obj = do
   patched <- addAtPath ps v sub
   return $ Object $ HM.insert p patched rest
 addAtPath [] v _ = Just v
-
-toPath :: Text -> Path
-toPath = T.split (=='/')
 
 fromPath :: Path -> Text
 fromPath = mconcat . fmap (flip T.snoc '/')

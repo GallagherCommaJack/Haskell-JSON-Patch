@@ -1,26 +1,26 @@
-module ParsePatch
-       (Patch(..),
-        parsePatch
-       )
+module ParsePatch (Operation(..),
+                   parsePatchFile
+                  )
        where
 
-import Data.Maybe (fromJust)
+import Data.Monoid ((<>))
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad (mzero)
+import Control.Monad (mzero, join)
 
-import qualified Data.ByteString.Lazy.Char8 as BS
-import qualified Data.Text.Lazy             as T
-import qualified Data.Text.Lazy.Encoding    as T
+import Data.Text (Text(..))
+import qualified Data.Text          as T (split)
+import qualified Data.Text.Encoding as T (encodeUtf8)
 
-import Data.Aeson
+import qualified Data.ByteString.Lazy.Char8 as BS (ByteString(..), pack, readFile)
 
-data Patch = Patch { op :: T.Text,
-                     path :: T.Text,
-                     from :: Maybe T.Text,
-                     value :: Maybe T.Text
-                   } deriving (Show, Read, Eq)
+import Data.Aeson (Value(..), FromJSON(..), (.:), (.:?), decode)
 
---
+data Patch = Patch { op :: Text,
+                     path :: Text,
+                     from :: Maybe Text,
+                     value :: Maybe Value
+                   }
+
 instance FromJSON Patch where
   parseJSON (Object v) = Patch <$>
                          v .: "op" <*>
@@ -29,25 +29,3 @@ instance FromJSON Patch where
                          v .:? "value"
   parseJSON _ = mzero
 
---
-instance ToJSON Patch where
-  toJSON p@(Patch op path from value) = case op of
-    "add" -> case value of
-      (Just val) -> object [ "op" .= op,
-                             "path" .= path,
-                             "value" .= val]
-      Nothing -> error $ "Cannot convert " ++ show p ++ " to JSON"
-    "remove" -> object [ "op" .= op,
-                         "path" .= path ]
-    _ -> error $ "Cannot convert " ++ show p ++ " to JSON"
---}
-jsonTest :: BS.ByteString
-jsonTest = BS.pack $ "{ \"op\" : \"add\", \"path\" : \"/derp\"" ++
-                     ", \"value\" : \"derp\" }"
-
-parsePatch :: T.Text -> Maybe Patch
-parsePatch = decode . T.encodeUtf8
---
-patchFile :: String -> IO [Patch]
-patchFile file = fromJust <$> decode <$> BS.readFile file
---}
