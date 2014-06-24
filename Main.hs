@@ -5,7 +5,7 @@ import Data.Text (unpack)
 
 import System.Environment (getArgs)
 
-import Data.ByteString.Lazy.Char8 as BS (readFile, writeFile, ByteString(..))
+import Data.ByteString.Lazy.Char8 as BS (readFile, putStrLn, ByteString(..))
 
 import ValuePatch (applyPatches)
 import ParsePatch (parsePatchFile)
@@ -15,10 +15,10 @@ main = do
   case args of
     (p:fs:_) -> do
       ops <- parsePatchFile p
-      obj <- (eitherDecode :: BS.ByteString -> Either String Value) <$> BS.readFile fs
+      obj <- eitherDecode <$> BS.readFile fs :: IO (Either String Value)
       case obj of (Right o) ->
                     case applyPatches ops o of
-                      (Right n) -> BS.writeFile fs $ encode n
+                      (Right n) -> BS.putStrLn $ encode n
                       (Left err) -> error $ unpack err
                   (Left err) -> error $ "Couldn't parse file " <> fs
                                 <> ", Aeson threw error:\n" <> err
