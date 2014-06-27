@@ -11,11 +11,15 @@ import Control.Applicative ((<$>))
 import Data.Monoid ((<>), mconcat)
 
 import Data.Text (Text(..))
+import qualified Data.Text as T (all, unpack, pack, snoc)
 
-import qualified Data.Text as T (pack, snoc)
+import Data.Char (isDigit)
 
 import Data.HashMap.Strict (HashMap(..))
 import qualified Data.HashMap.Strict as HM (lookup, insert, delete, adjust)
+
+import qualified Data.Vector as V
+import Data.Vector.Mutable (write)
 
 import ParsePatch (Operation(..))
 
@@ -30,26 +34,45 @@ objToText (String t) = t
 objToText Null = ""
 
 findAndDelete :: Path -> Value -> Maybe (Value,Value)
-findAndDelete [k] (Object h) =
-  HM.lookup k h >>= \v -> Just (v,Object $ HM.delete k h)
-findAndDelete (x:xs) (Object h) = do
-  sub <- HM.lookup x h
-  (v,new) <- findAndDelete xs sub
-  let deleted = HM.delete x h
-  return (v, Object $ HM.insert x new deleted)
+findAndDelete [k] (Object h) = HM.lookup k h >>= \v -> Just (v,Object $ HM.delete k h)
+findAndDelete (x:xs) (Object h) = do sub <- HM.lookup x h
+                                     (v,new) <- findAndDelete xs sub
+                                     let deleted = HM.delete x h
+                                     return (v, Object $ HM.insert x new deleted)
+findAndDelete path (Array arr) = case path of
+  [p]    -> if T.all isDigit p
+            then do e <- el V.!? 0
+                    return (e, Array $ first <> rest')
+            else Nothing
+  (p:ps) -> if T.all isDigit p
+            then do e <- el V.!? 0
+                    (v, rest) <- findAndDelete ps e
+                    return (v, Array $ V.modify (\a -> write a i rest) arr)
+            else Nothing
+  where i = read $ T.unpack $ head path
+        (first, rest) = V.splitAt i arr
+        (el, rest') = V.splitAt 1 rest
 findAndDelete _ _ = Nothing
 
 --Wouldn't be necessary but Aeson uses strict hashmaps...
 findAtPath :: Path -> Value -> Maybe Value
 findAtPath (k:ks) (Object h) = HM.lookup k h >>= findAtPath ks
+findAtPath (p:ps) (Array a)  = if T.all isDigit p
+                               then a V.!? read (T.unpack p) >>= findAtPath ps
+                               else Nothing
 findAtPath [] a = Just a
 
 addAtPath :: Path -> Value -> Value -> Maybe Value
-addAtPath [p] v (Object h) = Just $ Object $ HM.insert p v h
+addAtPath [p] v obj = Just $ case obj of
+  (Object h) -> Object $ HM.insert p v h
+  (Array arr) -> Array $ V.modify (\vec -> write vec (read $ T.unpack p) v) arr
 addAtPath (p:ps) v obj = do
-  (sub, (Object rest)) <- findAndDelete [p] obj
-  patched <- addAtPath ps v sub
-  return $ Object $ HM.insert p patched rest
+  (sub, o) <- findAndDelete [p] obj
+  case o of
+    (Object rest) -> do patched <- addAtPath ps v sub
+                        return $ Object $ HM.insert p patched rest
+    (Array rest) -> do patched <- addAtPath ps v sub
+                       return $ Array $ V.modify (\vec -> write vec (read $ T.unpack p) v) rest
 addAtPath [] v _ = Just v
 
 fromPath :: Path -> Text
@@ -65,9 +88,10 @@ patch (Rem [])    _   = Left "Tried to delete whole file - use rm instead"
 patch (Cop [] p2) obj = patch (Add p2 obj) obj
 patch (Mov [] _)  _   = Left "Can't move whole document to subdirectory of document!"
 patch (Rep [] v)  _   = Right v
-patch (Tes [] v)  obj = if v == obj then Right obj
-                          else Left $ "Value at path / is "
-                               <> objToText obj <> " not " <> objToText v
+patch (Tes [] v)  obj = if v == obj
+                        then Right obj
+                        else Left $ "Value at path / is "
+                             <> objToText obj <> " not " <> objToText v
 
 patch (Add p v) obj = case addAtPath p v obj of
   Just a -> Right a
@@ -81,9 +105,8 @@ patch (Cop p1 p2) obj = case findAtPath p1 obj of
   (Just old) -> patch (Add p2 old) obj
   Nothing   -> Left $ "Couldn't find value at " <> fromPath p1
 
-patch (Mov p1 p2) obj = do
-  (old,new) <- maybeToEither $ findAndDelete p1 obj
-  patch (Add p2 old) new
+patch (Mov p1 p2) obj = do (old,new) <- maybeToEither $ findAndDelete p1 obj
+                           patch (Add p2 old) new
 
 patch (Rep p v) obj = case findAndDelete p obj of
   Nothing -> Left $ "Couldn't find value at path " <> fromPath p
