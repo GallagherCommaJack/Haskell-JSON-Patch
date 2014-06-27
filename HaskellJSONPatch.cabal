@@ -18,8 +18,7 @@ library
   exposed-modules:     ParsePatch,
                        ValuePatch
 
-  extensions:          OverloadedStrings,
-                       UnicodeSyntax
+  extensions:          OverloadedStrings
 
   -- other-modules:       
   build-depends:       base ==4.6.*,
