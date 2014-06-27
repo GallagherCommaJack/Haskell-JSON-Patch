@@ -42,6 +42,7 @@ parsePatchFile file = do
 type Path = [Text]
 
 toPath :: Text -> Path
+toPath "" = [""]
 toPath t | T.findIndex (=='/') t == Just 0  = T.split (=='/') $ T.tail t
          | otherwise = T.split (=='/') t
 
