@@ -21,7 +21,7 @@ library
   extensions:          OverloadedStrings
 
   -- other-modules:       
-  build-depends:       base ==4.6.*,
+  build-depends:       base ==4.*,
                        unordered-containers,
                        vector,
                        text,
@@ -33,7 +33,7 @@ executable patch
   extensions:          OverloadedStrings, UnicodeSyntax
   other-modules:       ParsePatch,
                        ValuePatch
-  build-depends:       base ==4.6.*,
+  build-depends:       base ==4.*,
                        unordered-containers,
                        vector,
                        text,
