@@ -21,9 +21,9 @@ import qualified Data.HashMap.Strict as HM (lookup, insert, delete, adjust)
 import qualified Data.Vector as V
 import Data.Vector.Mutable (write)
 
-import ParsePatch (Operation(..))
+import ParsePatch
 
-type Path = [Text]
+type Path = [Ix]
 
 objToText :: Value -> Text
 objToText (Object o) = T.pack $ show o
@@ -34,49 +34,45 @@ objToText (String t) = t
 objToText Null = ""
 
 findAndDelete :: Path -> Value -> Maybe (Value,Value)
-findAndDelete [k] (Object h) = HM.lookup k h >>= \v -> Just (v,Object $ HM.delete k h)
-findAndDelete (x:xs) (Object h) = do sub <- HM.lookup x h
-                                     (v,new) <- findAndDelete xs sub
-                                     let deleted = HM.delete x h
-                                     return (v, Object $ HM.insert x new deleted)
-findAndDelete path (Array arr) = case path of
-  [p]    -> if T.all isDigit p
-            then do e <- el V.!? 0
-                    return (e, Array $ first <> rest')
-            else Nothing
-  (p:ps) -> if T.all isDigit p
-            then do e <- el V.!? 0
-                    (v, rest) <- findAndDelete ps e
-                    return (v, Array $ V.modify (\a -> write a i rest) arr)
-            else Nothing
-  where i = read $ T.unpack $ head path
-        (first, rest) = V.splitAt i arr
-        (el, rest') = V.splitAt 1 rest
+findAndDelete [(K k)] (Object h) = HM.lookup k h >>= \v -> Just (v,Object $ HM.delete k h)
+findAndDelete ((K k):xs) (Object h) = do sub <- HM.lookup k h
+                                         (v,new) <- findAndDelete xs sub
+                                         let deleted = HM.delete k h
+                                         return (v, Object $ HM.insert k new deleted)
+findAndDelete [(N i)] (Array arr) =
+  let (first, rest) = V.splitAt i arr
+      (el, rest') = V.splitAt 1 rest
+  in do e <- el V.!? 0
+        return (e, Array $ first <> rest')
+findAndDelete ((N i):ps) (Array arr) =
+  let (first, rest) = V.splitAt i arr
+      (el, rest') = V.splitAt 1 rest
+  in do e <- el V.!? 0
+        (v, rest) <- findAndDelete ps e
+        return (v, Array $ V.modify (\a -> write a i rest) arr)
 findAndDelete _ _ = Nothing
 
 --Wouldn't be necessary but Aeson uses strict hashmaps...
 findAtPath :: Path -> Value -> Maybe Value
-findAtPath (k:ks) (Object h) = HM.lookup k h >>= findAtPath ks
-findAtPath (p:ps) (Array a)  = if T.all isDigit p
-                               then a V.!? read (T.unpack p) >>= findAtPath ps
-                               else Nothing
+findAtPath ((K k):ks) (Object h) = HM.lookup k h >>= findAtPath ks
+findAtPath ((N i):ps) (Array a)  = a V.!? i >>= findAtPath ps
 findAtPath [] a = Just a
 
 addAtPath :: Path -> Value -> Value -> Maybe Value
-addAtPath [p] v obj = Just $ case obj of
-  (Object h) -> Object $ HM.insert p v h
-  (Array arr) -> Array $ V.modify (\vec -> write vec (read $ T.unpack p) v) arr
-addAtPath (p:ps) v obj = do
-  (sub, o) <- findAndDelete [p] obj
-  case o of
-    (Object rest) -> do patched <- addAtPath ps v sub
-                        return $ Object $ HM.insert p patched rest
-    (Array rest) -> do patched <- addAtPath ps v sub
-                       return $ Array $ V.modify (\vec -> write vec (read $ T.unpack p) v) rest
+addAtPath [(K k)] v (Object h) = Just $ Object $ HM.insert k v h
+addAtPath [(N i)] v (Array arr) = Just $ Array $ V.modify (\vec -> write vec i v) arr
+addAtPath (p:ps) v obj = do (sub, o) <- findAndDelete [p] obj
+                            case o of
+                              (Object rest) -> do patched <- addAtPath ps v sub
+                                                  return $ Object $ HM.insert k patched rest
+                              (Array rest) -> do patched <- addAtPath ps v sub
+                                                 return $ Array $ V.modify (\vec -> write vec i v) rest
+  where i :: Int
+        i = case p of (N i) -> i
+                      _ -> undefined
+        k = case p of (K k') -> k'
+                      _ -> undefined
 addAtPath [] v _ = Just v
-
-fromPath :: Path -> Text
-fromPath = mconcat . fmap (flip T.snoc '/')
 
 maybeToEither :: Maybe a -> Either Text a
 maybeToEither (Just a) = Right a

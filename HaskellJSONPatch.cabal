@@ -26,6 +26,7 @@ library
                        vector,
                        text,
                        bytestring,
+                       lens,
                        aeson ==0.7.*
 
 executable patch

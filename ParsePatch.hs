@@ -1,14 +1,14 @@
-module ParsePatch (Operation(..),
-                   parsePatchFile
-                  )
+module ParsePatch (Operation(..), Ix(..), parsePatchFile)
        where
 
 import Data.Monoid ((<>))
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad (mzero, join)
 
+import Data.Char (isDigit)
+
 import Data.Text (Text(..))
-import qualified Data.Text          as T (split, tail, findIndex)
+import qualified Data.Text          as T (split, tail, findIndex, unpack, all)
 import qualified Data.Text.Encoding as T (encodeUtf8)
 
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString(..), pack, readFile)
@@ -39,19 +39,27 @@ parsePatchFile file = do
     Nothing -> error $ "File " <> file <> " contains invalid patches"
 --Conversion to operations
 
-type Path = [Text]
+toPath :: Text -> [Ix]
+toPath "" = [K ""]
+toPath "/" = []
+toPath ps | T.findIndex (=='/') ps == Just 0 = map tToIx $ T.split (=='/') ps
+          | otherwise = map tToIx $ T.split (=='/') ps
 
-toPath :: Text -> Path
-toPath "" = [""]
-toPath t | T.findIndex (=='/') t == Just 0  = T.split (=='/') $ T.tail t
-         | otherwise = T.split (=='/') t
+tToIx t | T.all isDigit t = N $ read $ T.unpack t
+        | otherwise = K t
 
-data Operation = Add Path Value
-               | Rem Path
-               | Cop Path Path
-               | Mov Path Path
-               | Rep Path Value
-               | Tes Path Value
+data Ix = N Int | K Text
+
+instance Show Ix where
+  show (N n) = show n
+  show (K t) = T.unpack t
+
+data Operation = Add [Ix] Value
+               | Rem [Ix]
+               | Cop [Ix] [Ix]
+               | Mov [Ix] [Ix]
+               | Rep [Ix] Value
+               | Tes [Ix] Value
                deriving (Show)
 
 patchToOp p = case op p of
