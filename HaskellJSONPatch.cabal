@@ -16,7 +16,7 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     ParsePatch,
-                       ValuePatch
+                       LensPatch
 
   extensions:          OverloadedStrings
 
@@ -33,7 +33,7 @@ executable patch
   main-is:             Main.hs
   extensions:          OverloadedStrings, UnicodeSyntax
   other-modules:       ParsePatch,
-                       ValuePatch
+                       LensPatch
   build-depends:       base ==4.*,
                        unordered-containers,
                        vector,

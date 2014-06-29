@@ -7,7 +7,7 @@ import System.Environment (getArgs)
 
 import Data.ByteString.Lazy.Char8 as BS (readFile, putStrLn, ByteString(..))
 
-import ValuePatch (applyPatches)
+import LensPatch (applyPatches)
 import ParsePatch (parsePatchFile)
 
 main = do
