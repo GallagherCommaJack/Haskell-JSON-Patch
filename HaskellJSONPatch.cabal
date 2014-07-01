@@ -39,4 +39,5 @@ executable patch
                        vector,
                        text,
                        bytestring,
+                       lens,
                        aeson ==0.7.*
