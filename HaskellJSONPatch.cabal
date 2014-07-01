@@ -17,27 +17,27 @@ cabal-version:       >=1.8
 library
   exposed-modules:     ParsePatch,
                        LensPatch
-
   extensions:          OverloadedStrings
+  build-depends:       base                     >= 4.3      && < 5,
+                       unordered-containers     >= 0.2      && < 0.3,
+                       vector                   >= 0.9      && < 0.11,
+                       text                     >= 0.11     && < 2.11,
+                       bytestring               >= 0.9.1.10 && < 0.11,
+                       lens                     >= 4        && < 5,
+                       aeson                    >= 0.7      && < 0.8
 
   -- other-modules:       
-  build-depends:       base ==4.*,
-                       unordered-containers,
-                       vector,
-                       text,
-                       bytestring,
-                       lens,
-                       aeson ==0.7.*
+  
 
 executable patch
   main-is:             Main.hs
   extensions:          OverloadedStrings, UnicodeSyntax
   other-modules:       ParsePatch,
                        LensPatch
-  build-depends:       base ==4.*,
-                       unordered-containers,
-                       vector,
-                       text,
-                       bytestring,
-                       lens,
-                       aeson ==0.7.*
+  build-depends:       base                     >= 4.3      && < 5,
+                       unordered-containers     >= 0.2      && < 0.3,
+                       vector                   >= 0.9      && < 0.11,
+                       text                     >= 0.11     && < 2.11,
+                       bytestring               >= 0.9.1.10 && < 0.11,
+                       lens                     >= 4        && < 5,
+                       aeson                    >= 0.7      && < 0.8
