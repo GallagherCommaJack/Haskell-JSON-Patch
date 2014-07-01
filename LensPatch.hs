@@ -1,74 +1,74 @@
-module LensPatch (patch, applyPatches, findAtPath, fAtPath, addAtPath, setAtPath)
-       where
+{-# LANGUAGE RankNTypes #-}
+module LensPatch (patch,
+                  applyPatches,
+                  findAtPath,
+                  fAtPath,
+                  fAtPathA,
+                  addAtPath,
+                  addAtPathA,
+                  setAtPath,
+                  setAtPathA,
+                  toLens,
+                  setj,
+                  remove
+                 ) where
 
+import Prelude hiding (foldr1)
 import Data.Aeson
 import Data.Aeson.Lens
 
-import Control.Applicative ((<$>))
-import Control.Arrow (second)
-import Control.Lens ((^?), (.~), (%~))
+import Data.Foldable (Foldable(..), foldr1)
 
-import Data.List (foldl')
+import Control.Applicative (Applicative(..), (<$>), (<*>))
+import Control.Arrow ((***))
+import Control.Exception (assert)
+import Control.Lens
 
-import Data.Text (Text(..))
-import qualified Data.Text as T (all, unpack, pack, snoc)
-
-import Data.Maybe (fromJust)
 import Data.Monoid ((<>))
-
-import qualified Data.Vector as V ((!?), ifilter, modify)
-import Data.Vector.Mutable (write)
-
-import qualified Data.HashMap.Strict as HM
-
+import Data.Vector (ifilter)
+import Data.HashMap.Strict (delete)
 import ParsePatch (Ix(..), Operation(..))
 
+toLens :: (AsValue t) => Ix -> Traversal' t Value
+toLens (N n) = nth n
+toLens (K k) = key k
+setj :: Ix -> Value -> Value -> Value
+setj = set . toLens
+remove :: Ix -> Value -> Value
+remove (K k) (Object h) = Object $ delete k h
+remove (N i) (Array v) = Array $ ifilter (const . (/= i)) v
+remove _ v = v
 findAtPath :: [Ix] -> Value -> Maybe Value
-findAtPath ((N n):ps) a = findAtPath ps =<< a ^? nth n
-findAtPath ((K k):ps) o = findAtPath ps =<< o ^? key k
+findAtPath (p:ps) j = findAtPath ps =<< j ^? toLens p
 findAtPath [] o = Just o
 
+fAtPathA :: Applicative f => (Value -> f Value) -> [Ix] -> Value -> f Value
+fAtPathA f (p:ps) = toLens p %%~ fAtPathA f ps
+fAtPathA f [] = f
+
+setAtPathA :: Applicative f => f Value -> [Ix] -> Value -> f Value
+setAtPathA v = fAtPathA $ const v
+
+addAtPathA :: Applicative f => [Ix] -> f Value -> Value -> f Value
+addAtPathA [p] v j = set (toLens p) <$> v <*> pure j
+addAtPathA (p:ps) v j = toLens p %%~ addAtPathA ps v $ j
+addAtPathA [] v _ = v
+
 fAtPath :: (Value -> Value) -> [Ix] -> Value -> Value
-fAtPath f ((N n):ps) a = nth n %~ fAtPath f ps $ a
-fAtPath f ((K k):ps) o = key k %~ fAtPath f ps $ o
-fAtPath f [] v = f v
+fAtPath f ps = runIdentity . fAtPathA (Identity . f) ps
 
 setAtPath :: Value -> [Ix] -> Value -> Value
 setAtPath v = fAtPath $ const v
 
 addAtPath :: [Ix] -> Value -> Value -> Value
-addAtPath [(N n)] v a = nth n .~ v $ a
-addAtPath [(K k)] v o = key k .~ v $ o
-addAtPath ((N n):ps) v a = nth n %~ addAtPath ps v $ a
-addAtPath ((K k):ps) v o = key k %~ addAtPath ps v $ o
-addAtPath [] v _ = v
+addAtPath ps v = runIdentity . addAtPathA ps (Identity v)
 
 findAndDelete :: [Ix] -> Value -> Maybe (Value,Value)
-findAndDelete [(N n)] (Array v) = do
-  el <- v V.!? n
-  Just $ (el, Array $ V.ifilter (const . (/= n)) v)
-findAndDelete ((N i):ps) (Array v) = do
-  sub <- v V.!? i
-  (el,sub') <- findAndDelete ps sub
-  Just $ (el, Array $ V.modify (\vec -> write vec i sub') v)
-findAndDelete [(K k)] (Object o) = do
-  el <- HM.lookup k o
-  Just $ (el, Object $ HM.delete k o)
-findAndDelete ((K k):ps) (Object o) = do
-  sub <- HM.lookup k o
-  (el,sub') <- findAndDelete ps sub
-  Just $ (el, Object $ HM.insert k sub' o)
-findAndDelete _ _ = Nothing
-
-patch :: Operation -> Value -> Either Text Value
-patch (Add [] v)  _   = Right v
-patch (Rep [] v)  _   = Right v
-patch (Rem [])    _   = Left "Tried to delete whole file - use rm instead"
-patch (Cop [] p2) obj = patch (Add p2 obj) obj
-patch (Tes [] v)  obj = if v == obj
-                        then Right obj
-                        else Left $ "Value at path / is "
-                             <> objToText obj <> " not " <> objToText v
+findAndDelete [p] o = do el <- o ^? toLens p
+                         return (el, remove p o)
+findAndDelete (p:ps) o = do s <- o ^? toLens p
+                            (id *** setj p o) <$> findAndDelete ps s
+findAndDelete [] _ = Nothing
 
 patch (Add p v) obj = Right $ addAtPath p v obj
 patch (Rem p) obj = case snd <$> findAndDelete p obj of
@@ -82,10 +82,10 @@ patch (Mov p1 p2) obj = case findAndDelete p1 obj of
   Nothing -> Left $  "Can't find value at path " <> fromPath p1
 patch (Rep p v) obj = Right $ setAtPath v p obj
 patch (Tes p t) obj = case findAtPath p obj of
-  (Just v) -> if t == v || objToText t == objToText v
+  (Just v) -> if t == v || show t == show v
               then return obj
               else Left $ "Value at path " <> fromPath p <> " is "
-                   <> objToText v <> " not " <> objToText t
+                   <> show v <> " not " <> show t
   Nothing -> Left $ "Couldn't find value at path " <> fromPath p
 
 applyPatches :: [Operation] -> Value -> Either Text Value
