@@ -19,7 +19,7 @@ main = do
       case obj of (Right o) ->
                     case applyPatches ops o of
                       (Right n) -> BS.putStrLn $ encode n
-                      (Left err) -> error $ unpack err
+                      (Left err) -> error err
                   (Left err) -> error $ "Couldn't parse file " <> fs
                                 <> ", Aeson threw error:\n" <> err
     _ -> error "Wrong number of arguments"

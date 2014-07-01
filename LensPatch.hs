@@ -1,20 +1,27 @@
 {-# LANGUAGE RankNTypes #-}
-module LensPatch (patch,
-                  applyPatches,
-                  findAtPath,
-                  fAtPath,
-                  fAtPathA,
-                  addAtPath,
-                  addAtPathA,
-                  setAtPath,
-                  setAtPathA,
-                  safeFAtPath,
-                  safeAddAtPath,
-                  safeSetAtPath,
-                  toLens,
-                  setj,
-                  remove
-                 ) where
+module LensPatch (
+  -- * Applying JSON Patches <http://jsonpatch.com>
+  patch,
+  applyPatches,
+  -- * Helpers
+  -- ** Misc
+  toLens,
+  setj,
+  remove,
+  -- ** Unsafe traversals
+  findAtPath,
+  fAtPath,
+  addAtPath,
+  setAtPath,
+  -- ** Unsafe Applicative Traversals
+  fAtPathA,
+  addAtPathA,
+  setAtPathA,
+  -- ** Safe Traversals
+  safeFAtPath,
+  safeAddAtPath,
+  safeSetAtPath
+  ) where
 
 import Prelude hiding (foldr1)
 import Data.Aeson
@@ -32,49 +39,75 @@ import Data.Vector (ifilter)
 import Data.HashMap.Strict (delete)
 import ParsePatch (Ix(..), Operation(..))
 
+-- |Converts an Ix value to a JSON lens
+--
+-- > toLens (N n) = nth n
+-- > toLens (K k) = key k
 toLens :: (AsValue t) => Ix -> Traversal' t Value
 toLens (N n) = nth n
 toLens (K k) = key k
+
+-- |Converts an Ix value to a setter lens
+--
+-- > setj = set ∘ toLens
 setj :: Ix -> Value -> Value -> Value
 setj = set . toLens
+
+-- | Removes the value at an Ix from a value, deleting nothing if the value isn't indexable
+--
+-- > remove (K k) (Object h) = Object $ delete k h
+-- > remove (N i) (Array v) = Array $ ifilter (const ∘ (≢ i)) v
+-- > remove _ v = v
 remove :: Ix -> Value -> Value
 remove (K k) (Object h) = Object $ delete k h
 remove (N i) (Array v) = Array $ ifilter (const . (/= i)) v
 remove _ v = v
+
+-- |Traverses through a hierarchy of JSON values and returns what it finds
 findAtPath :: [Ix] -> Value -> Maybe Value
 findAtPath (p:ps) j = findAtPath ps =<< j ^? toLens p
 findAtPath [] o = Just o
 
+-- |Applies an applicative operation and stores the new value in the old context
 fAtPathA :: Applicative f => (Value -> f Value) -> [Ix] -> Value -> f Value
 fAtPathA f (p:ps) = toLens p %%~ fAtPathA f ps
 fAtPathA f [] = f
 
+-- |Inserts an applicative value and returns the new value in the old context
 setAtPathA :: Applicative f => f Value -> [Ix] -> Value -> f Value
 setAtPathA v = fAtPathA $ const v
 
+-- |Adds an applicative value at a given path, adding a key if there wasn't one already
 addAtPathA :: Applicative f => [Ix] -> f Value -> Value -> f Value
 addAtPathA [p] v j = set (toLens p) <$> v <*> pure j
 addAtPathA (p:ps) v j = toLens p %%~ addAtPathA ps v $ j
 addAtPathA [] v _ = v
 
+-- |Applies a normal function to the value at a given path
 fAtPath :: (Value -> Value) -> [Ix] -> Value -> Value
 fAtPath f ps = runIdentity . fAtPathA (Identity . f) ps
 
+-- |Inserts a normal value to a given path
+setAtPath :: Value -> [Ix] -> Value -> Value
+setAtPath v = fAtPath $ const v
+
+-- |Adds a normal value at the given path
+addAtPath :: [Ix] -> Value -> Value -> Value
+addAtPath ps v = runIdentity . addAtPathA ps (Identity v)
+
+-- |Only returns if it can make the full traversal
 safeFAtPath :: (Value -> Value) -> [Ix] -> Value -> Maybe Value
 safeFAtPath f (p:ps) j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeFAtPath f ps
 safeFAtPath f [] j = Just $ f j
 
+-- |Only returns if it can make the full traversal
 safeAddAtPath :: [Ix] -> Value -> Value -> Maybe Value
 safeAddAtPath [p] v j = Just $ toLens p .~ v $ j
 safeAddAtPath (p:ps) v j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeAddAtPath ps v
 
+-- |Only returns if it can make the full traversal
 safeSetAtPath :: Value -> [Ix] -> Value -> Maybe Value
 safeSetAtPath = safeFAtPath . const
-setAtPath :: Value -> [Ix] -> Value -> Value
-setAtPath v = fAtPath $ const v
-
-addAtPath :: [Ix] -> Value -> Value -> Value
-addAtPath ps v = runIdentity . addAtPathA ps (Identity v)
 
 findAndDelete :: [Ix] -> Value -> Maybe (Value,Value)
 findAndDelete [p] o = do el <- o ^? toLens p
@@ -83,7 +116,8 @@ findAndDelete (p:ps) o = do s <- o ^? toLens p
                             (id *** setj p o) <$> findAndDelete ps s
 findAndDelete [] _ = Nothing
 
-patch (Add p v) obj = Right $ addAtPath p v obj
+-- |Applies a single JSON patch (described here: <http://jsonpatch.com/>)
+patch :: Operation -> Value -> Either String Value
 patch (Add p v) obj = case safeAddAtPath p v obj of
   (Just a) -> Right a
   Nothing -> Left $ "Nothing to remove at " <> fromPath p
@@ -106,19 +140,9 @@ patch (Tes p t) obj = case findAtPath p obj of
                    <> show v <> " not " <> show t
   Nothing -> Left $ "Couldn't find value at path " <> fromPath p
 
-applyPatches :: [Operation] -> Value -> Either Text Value
+-- |Takes a list of Operations and turns applies them to a JSON value
+applyPatches :: [Operation] -> Value -> Either String Value
 applyPatches ops v = foldl' (>>=) (Right v) $ map patch ops
 
-objToText :: Value -> Text
-objToText (Object o) = T.pack $ show o
-objToText (Array v) = T.pack $ show v
-objToText (Number n) = T.pack $ show n
-objToText (Bool b) = T.pack $ show b
-objToText (String t) = t
-objToText Null = ""
-
-fromPath :: Path -> Text
-fromPath = mconcat . fmap (flip T.snoc '/' . toText)
-
-toText (K k) = k
-toText (N i) = T.pack $ show i
+fromPath :: (Functor f, Foldable f, Show b) => f b -> String
+fromPath = foldr1 (<>)  . fmap (cons '/' . show)
