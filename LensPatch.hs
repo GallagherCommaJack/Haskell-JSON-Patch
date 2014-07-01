@@ -57,6 +57,16 @@ addAtPathA [] v _ = v
 fAtPath :: (Value -> Value) -> [Ix] -> Value -> Value
 fAtPath f ps = runIdentity . fAtPathA (Identity . f) ps
 
+safeFAtPath :: (Value -> Value) -> [Ix] -> Value -> Maybe Value
+safeFAtPath f (p:ps) j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeFAtPath f ps
+safeFAtPath f [] j = Just $ f j
+
+safeAddAtPath :: [Ix] -> Value -> Value -> Maybe Value
+safeAddAtPath [p] v j = Just $ toLens p .~ v $ j
+safeAddAtPath (p:ps) v j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeAddAtPath ps v
+
+safeSetAtPath :: Value -> [Ix] -> Value -> Maybe Value
+safeSetAtPath = safeFAtPath . const
 setAtPath :: Value -> [Ix] -> Value -> Value
 setAtPath v = fAtPath $ const v
 
@@ -71,6 +81,9 @@ findAndDelete (p:ps) o = do s <- o ^? toLens p
 findAndDelete [] _ = Nothing
 
 patch (Add p v) obj = Right $ addAtPath p v obj
+patch (Add p v) obj = case safeAddAtPath p v obj of
+  (Just a) -> Right a
+  Nothing -> Left $ "Nothing to remove at " <> fromPath p
 patch (Rem p) obj = case snd <$> findAndDelete p obj of
   (Just a) -> Right a
   Nothing -> Left $ "Nothing to remove at " <> fromPath p
@@ -80,7 +93,9 @@ patch (Cop p1 p2) obj = case findAtPath p1 obj of
 patch (Mov p1 p2) obj = case findAndDelete p1 obj of
   (Just (old,new)) -> patch (Add p2 old) new
   Nothing -> Left $  "Can't find value at path " <> fromPath p1
-patch (Rep p v) obj = Right $ setAtPath v p obj
+patch (Rep p v) obj = case safeSetAtPath v p obj of
+  (Just a) -> Right a
+  Nothing -> Left $ "Can't find value at path " <> fromPath p
 patch (Tes p t) obj = case findAtPath p obj of
   (Just v) -> if t == v || show t == show v
               then return obj
