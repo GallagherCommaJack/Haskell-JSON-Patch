@@ -48,10 +48,10 @@ parsePatches str = case decode str >>= sequence . map patchToOp of
 toPath :: Text -> [Ix]
 toPath "" = [K ""]
 toPath "/" = []
-toPath ps | T.findIndex (=='/') ps == Just 0 = map tToIx $ T.split (=='/') ps
+toPath ps | T.findIndex (=='/') ps == Just 0 = map tToIx $ tail $ T.split (=='/') ps
           | otherwise = map tToIx $ T.split (=='/') ps
 
-tToIx t | T.all isDigit t = N $ read $ T.unpack t
+tToIx t | T.all isDigit t && not (null t) = N $ read $ T.unpack t
         | otherwise = K t
 
 -- |Datatype for indexing through JSON values
