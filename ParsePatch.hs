@@ -9,7 +9,7 @@ import Control.Monad (mzero, join)
 import Data.Char (isDigit)
 
 import Data.Text (Text(..))
-import qualified Data.Text          as T (split, tail, findIndex, unpack, all)
+import qualified Data.Text          as T (split, tail, findIndex, unpack, all, null)
 import qualified Data.Text.Encoding as T (encodeUtf8)
 
 import qualified Data.ByteString.Lazy.Char8 as BS (ByteString(..), pack, unpack, readFile)
@@ -51,7 +51,7 @@ toPath "/" = []
 toPath ps | T.findIndex (=='/') ps == Just 0 = map tToIx $ tail $ T.split (=='/') ps
           | otherwise = map tToIx $ T.split (=='/') ps
 
-tToIx t | T.all isDigit t && not (null t) = N $ read $ T.unpack t
+tToIx t | T.all isDigit t && not (T.null t) = N $ read $ T.unpack t
         | otherwise = K t
 
 -- |Datatype for indexing through JSON values
