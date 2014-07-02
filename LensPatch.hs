@@ -105,17 +105,17 @@ addAtPath ps v = runIdentity . addAtPathA ps (Identity v)
 
 -- |Only returns if it can make the full traversal
 safeFAtPath :: (Value -> Value) -> [Ix] -> Value -> Maybe Value
-safeFAtPath f (p:ps) j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeFAtPath f ps
-safeFAtPath f [] j = Just $ f j
+safeFAtPath f (p:ps) = toLens p %%~ safeFAtPath f ps
+safeFAtPath f [] = Just . f
 
 -- |Only returns if it can make the full traversal
 safeAddAtPath :: [Ix] -> Value -> Value -> Maybe Value
-safeAddAtPath [p] v j = Just $ add v p j
-safeAddAtPath (p:ps) v j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeAddAtPath ps v
+safeAddAtPath [p] v = Just . add v p
+safeAddAtPath (p:ps) v = toLens p %%~ safeAddAtPath ps v
 
 -- |Only returns if it can make the full traversal
 safeSetAtPath :: Value -> [Ix] -> Value -> Maybe Value
-safeSetAtPath = safeFAtPath . const
+safeSetAtPath v = safeFAtPath $ const v
 
 findAndDelete :: [Ix] -> Value -> Maybe (Value,Value)
 findAndDelete [p] o = do el <- o ^? toLens p
