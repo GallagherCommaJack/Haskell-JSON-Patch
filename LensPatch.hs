@@ -31,8 +31,6 @@ import Data.Aeson.Lens
 import Data.Foldable (Foldable(..), foldr1)
 
 import Control.Applicative (Applicative(..), (<$>), (<*>))
-import Control.Arrow ((***))
-import Control.Exception (assert)
 import Control.Lens
 
 import Data.Monoid ((<>))
@@ -123,7 +121,7 @@ findAndDelete :: [Ix] -> Value -> Maybe (Value,Value)
 findAndDelete [p] o = do el <- o ^? toLens p
                          return (el, remove p o)
 findAndDelete (p:ps) o = do s <- o ^? toLens p
-                            (id *** setj p o) <$> findAndDelete ps s
+                            (_2 %~ setj p o) <$> findAndDelete ps s
 findAndDelete [] _ = Nothing
 
 -- |Applies a single JSON patch (described here: <http://jsonpatch.com/>)
