@@ -124,7 +124,7 @@ findAndDelete (p:ps) o = do s <- o ^? toLens p
                             (_2 %~ setj p o) <$> findAndDelete ps s
 findAndDelete [] _ = Nothing
 
--- |Applies a single JSON patch (described here: <http://jsonpatch.com/>)
+-- |Applies a single JSON patch
 patch :: Operation -> Value -> Either String Value
 patch (Add p v) obj = case safeAddAtPath p v obj of
   (Just a) -> Right a
