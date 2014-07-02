@@ -8,6 +8,7 @@ module LensPatch (
   toLens,
   setj,
   remove,
+  add,
   -- ** Unsafe traversals
   findAtPath,
   fAtPath,
@@ -36,7 +37,9 @@ import Control.Lens
 
 import Data.Monoid ((<>))
 import Data.Vector (ifilter)
-import Data.HashMap.Strict (delete)
+import Data.HashMap.Strict (insert, delete)
+import Data.Vector (modify)
+import Data.Vector.Mutable (write)
 import ParsePatch (Ix(..), Operation(..))
 
 -- |Converts an Ix value to a JSON lens
@@ -53,7 +56,7 @@ toLens (K k) = key k
 setj :: Ix -> Value -> Value -> Value
 setj = set . toLens
 
--- | Removes the value at an Ix from a value, deleting nothing if the value isn't indexable
+-- |Removes the value at an Ix from a value, deleting nothing if the value isn't indexable
 --
 -- > remove (K k) (Object h) = Object $ delete k h
 -- > remove (N i) (Array v) = Array $ ifilter (const ∘ (≢ i)) v
@@ -62,6 +65,11 @@ remove :: Ix -> Value -> Value
 remove (K k) (Object h) = Object $ delete k h
 remove (N i) (Array v) = Array $ ifilter (const . (/= i)) v
 remove _ v = v
+
+-- |Adds a Value to an Ix within another Value, replacing whatever was already there
+add :: Value -> Ix -> Value -> Value
+add v (K k) (Object o) = Object $ insert k v o
+add v (N i) (Array a) = Array $ modify (\vec -> write vec i v) a
 
 -- |Traverses through a hierarchy of JSON values and returns what it finds
 findAtPath :: [Ix] -> Value -> Maybe Value
@@ -79,7 +87,7 @@ setAtPathA v = fAtPathA $ const v
 
 -- |Adds an applicative value at a given path, adding a key if there wasn't one already
 addAtPathA :: Applicative f => [Ix] -> f Value -> Value -> f Value
-addAtPathA [p] v j = set (toLens p) <$> v <*> pure j
+addAtPathA [p] v j = add <$> v <*> pure p <*> pure j
 addAtPathA (p:ps) v j = toLens p %%~ addAtPathA ps v $ j
 addAtPathA [] v _ = v
 
@@ -102,7 +110,7 @@ safeFAtPath f [] j = Just $ f j
 
 -- |Only returns if it can make the full traversal
 safeAddAtPath :: [Ix] -> Value -> Value -> Maybe Value
-safeAddAtPath [p] v j = Just $ toLens p .~ v $ j
+safeAddAtPath [p] v j = Just $ add v p j
 safeAddAtPath (p:ps) v j = fmap (toLens p .~ j) $ j ^? toLens p >>= safeAddAtPath ps v
 
 -- |Only returns if it can make the full traversal
