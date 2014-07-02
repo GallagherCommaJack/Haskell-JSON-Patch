@@ -38,8 +38,7 @@ import Control.Lens
 import Data.Monoid ((<>))
 import Data.Vector (ifilter)
 import Data.HashMap.Strict (insert, delete)
-import Data.Vector (modify)
-import Data.Vector.Mutable (write)
+import qualified Data.Vector as V
 import ParsePatch (Ix(..), Operation(..))
 
 -- |Converts an Ix value to a JSON lens
@@ -69,7 +68,10 @@ remove _ v = v
 -- |Adds a Value to an Ix within another Value, replacing whatever was already there
 add :: Value -> Ix -> Value -> Value
 add v (K k) (Object o) = Object $ insert k v o
-add v (N i) (Array a) = Array $ modify (\vec -> write vec i v) a
+add v (N i) (Array a) = if V.length a >= i
+                        then Array $ V.concat [first, V.fromList [v], rest]
+                        else error $ "Index out of bounds error"
+  where (first, rest) = V.splitAt i a
 
 -- |Traverses through a hierarchy of JSON values and returns what it finds
 findAtPath :: [Ix] -> Value -> Maybe Value
