@@ -142,7 +142,7 @@ patch (Rep p v) obj = case safeSetAtPath v p obj of
   (Just a) -> Right a
   Nothing -> Left $ "Can't find value at path " <> fromPath p
 patch (Tes p t) obj = case findAtPath p obj of
-  (Just v) -> if t == v || show t == show v
+  (Just v) -> if t == v
               then return obj
               else Left $ "Value at path " <> fromPath p <> " is "
                    <> show v <> " not " <> show t
