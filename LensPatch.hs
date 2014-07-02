@@ -2,7 +2,6 @@
 module LensPatch (
   -- * Applying JSON Patches <http://jsonpatch.com>
   patch,
-  applyPatches,
   -- * Helpers
   -- ** Misc
   toLens,
@@ -31,7 +30,7 @@ import Control.Lens
 
 import Data.Aeson
 import Data.Aeson.Lens
-import Data.Foldable (Foldable(..), foldr1)
+import Data.Foldable
 import Data.HashMap.Strict (insert, delete)
 import Data.Monoid
 import qualified Data.Vector as V
@@ -146,10 +145,6 @@ patch (Tes p t) obj = case findAtPath p obj of
               else Left $ "Value at path " <> fromPath p <> " is "
                    <> show v <> " not " <> show t
   Nothing -> Left $ "Couldn't find value at path " <> fromPath p
-
--- |Takes a list of Operations and turns applies them to a JSON value
-applyPatches :: [Operation] -> Value -> Either String Value
-applyPatches ops v = foldl' (>>=) (Right v) $ map patch ops
 
 fromPath :: (Functor f, Foldable f, Show b) => f b -> String
 fromPath = foldr1 (<>)  . fmap (cons '/' . show)

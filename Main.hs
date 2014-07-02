@@ -1,14 +1,14 @@
-import Data.Aeson (eitherDecode, encode, Value(..))
-import Control.Applicative ((<$>))
-import Data.Monoid ((<>))
-import Data.Text (unpack)
+import Data.Aeson
+import Control.Applicative
+import Data.List
+import Data.Monoid
 
-import System.Environment (getArgs)
+import System.Environment
 
-import Data.ByteString.Lazy.Char8 as BS (readFile, putStrLn, ByteString(..))
+import Data.ByteString.Lazy.Char8 as BS hiding (foldl')
 
-import LensPatch (applyPatches)
-import ParsePatch (parsePatchFile)
+import LensPatch
+import ParsePatch
 
 main = do
   args <- getArgs
@@ -16,10 +16,7 @@ main = do
     (p:fs:_) -> do
       ops <- parsePatchFile p
       obj <- eitherDecode <$> BS.readFile fs :: IO (Either String Value)
-      case obj of (Right o) ->
-                    case applyPatches ops o of
-                      (Right n) -> BS.putStrLn $ encode n
-                      (Left err) -> error err
-                  (Left err) -> error $ "Couldn't parse file " <> fs
-                                <> ", Aeson threw error:\n" <> err
+      case foldl' (\v p -> v >>= patch p) obj ops of
+        (Right n) -> BS.putStrLn $ encode n
+        (Left err) -> error err
     _ -> error "Wrong number of arguments"
