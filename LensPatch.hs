@@ -25,19 +25,18 @@ module LensPatch (
   ) where
 
 import Prelude hiding (foldr1)
-import Data.Aeson
-import Data.Aeson.Lens
 
-import Data.Foldable (Foldable(..), foldr1)
-
-import Control.Applicative (Applicative(..), (<$>), (<*>))
+import Control.Applicative
 import Control.Lens
 
-import Data.Monoid ((<>))
-import Data.Vector (ifilter)
+import Data.Aeson
+import Data.Aeson.Lens
+import Data.Foldable (Foldable(..), foldr1)
 import Data.HashMap.Strict (insert, delete)
+import Data.Monoid
 import qualified Data.Vector as V
-import ParsePatch (Ix(..), Operation(..))
+
+import ParsePatch
 
 -- |Converts an Ix value to a JSON lens
 --
@@ -60,7 +59,7 @@ setj = set . toLens
 -- > remove _ v = v
 remove :: Ix -> Value -> Value
 remove (K k) (Object h) = Object $ delete k h
-remove (N i) (Array v) = Array $ ifilter (const . (/= i)) v
+remove (N i) (Array v) = Array $ V.ifilter (const . (/= i)) v
 remove _ v = v
 
 -- |Adds a Value to an Ix within another Value, replacing whatever was already there

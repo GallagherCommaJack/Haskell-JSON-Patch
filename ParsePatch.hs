@@ -1,20 +1,18 @@
 module ParsePatch (Operation(..), Ix(..), parsePatchFile, parsePatches)
        where
 
-import Data.Maybe (fromJust)
-import Data.Monoid ((<>))
-import Control.Applicative ((<$>), (<*>))
-import Control.Monad (mzero, join)
+import Control.Applicative
+import Control.Monad
 
-import Data.Char (isDigit)
-
+import Data.Aeson
+import Data.Char
+import Data.Maybe
+import Data.Monoid
 import Data.Text (Text(..))
-import qualified Data.Text          as T (split, tail, findIndex, unpack, all, null)
-import qualified Data.Text.Encoding as T (encodeUtf8)
+import qualified Data.Text          as T
+import qualified Data.Text.Encoding as T
 
-import qualified Data.ByteString.Lazy.Char8 as BS (ByteString(..), pack, unpack, readFile)
-
-import Data.Aeson (Value(..), FromJSON(..), (.:), (.:?), decode)
+import qualified Data.ByteString.Lazy.Char8 as BS
 
 data Patch = Patch { op :: Text,
                      path :: Text,
