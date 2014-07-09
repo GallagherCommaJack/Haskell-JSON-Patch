@@ -50,7 +50,9 @@ toPath ps | T.findIndex (=='/') ps == Just 0 = map tToIx $ tail $ T.split (=='/'
           | otherwise = map tToIx $ T.split (=='/') ps
 
 tToIx t | T.all isDigit t && not (T.null t) = N $ read $ T.unpack t
-        | otherwise = K t
+        -- Handle forward slash literals
+        -- http://tools.ietf.org/html/rfc6901
+        | otherwise = K (T.replace "~0" "~" (T.replace "~1" "/" t))
 
 -- |Datatype for indexing through JSON values
 data Ix = N Int | K Text
