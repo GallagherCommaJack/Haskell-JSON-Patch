@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, TupleSections, NoMonomorphismRestriction #-}
 module LensPatch (
   -- * Applying JSON Patches <http://jsonpatch.com>
   patch,
@@ -23,19 +23,17 @@ module LensPatch (
   safeSetAtPath
   ) where
 
-import Prelude hiding (foldr1)
-
-import Control.Applicative
-import Control.Lens
-
-import Data.Aeson
-import Data.Aeson.Lens
-import Data.Foldable
-import Data.HashMap.Strict (insert, delete)
-import Data.Monoid
+import           Prelude hiding (foldr, foldl, foldr1, foldl1)
+import           Control.Applicative
+import           Control.Lens
+import           Data.Aeson
+import           Data.Aeson.Lens
+import           Data.Foldable
+import           Data.HashMap.Strict (insert, delete)
+import           Data.Monoid
 import qualified Data.Vector as V
 
-import ParsePatch
+import           ParsePatch
 
 -- |Converts an Ix value to a JSON lens
 --
@@ -44,6 +42,9 @@ import ParsePatch
 toLens :: (AsValue t) => Ix -> Traversal' t Value
 toLens (N n) = nth n
 toLens (K k) = key k
+
+navPath :: (Foldable t, Applicative f) => t Ix -> (Value -> f Value) -> Value -> f Value
+navPath = foldl' (\acc p -> acc . toLens p) id
 
 -- |Converts an Ix value to a setter lens
 --
@@ -66,18 +67,16 @@ add :: Value -> Ix -> Value -> Value
 add v (K k) (Object o) = Object $ insert k v o
 add v (N i) (Array a) = if V.length a >= i
                         then Array $ V.concat [first, V.fromList [v], rest]
-                        else error $ "Index out of bounds error"
+                        else error "Index out of bounds error"
   where (first, rest) = V.splitAt i a
 
 -- |Traverses through a hierarchy of JSON values and returns what it finds
 findAtPath :: [Ix] -> Value -> Maybe Value
-findAtPath (p:ps) j = findAtPath ps =<< j ^? toLens p
-findAtPath [] o = Just o
+findAtPath ps j = j ^? navPath ps
 
 -- |Applies an applicative operation and stores the new value in the old context
 fAtPathA :: Applicative f => (Value -> f Value) -> [Ix] -> Value -> f Value
-fAtPathA f (p:ps) = toLens p %%~ fAtPathA f ps
-fAtPathA f [] = f
+fAtPathA f ps = navPath ps %%~ f
 
 -- |Inserts an applicative value and returns the new value in the old context
 setAtPathA :: Applicative f => f Value -> [Ix] -> Value -> f Value
@@ -102,25 +101,30 @@ addAtPath :: [Ix] -> Value -> Value -> Value
 addAtPath ps v = runIdentity . addAtPathA ps (Identity v)
 
 -- |Only returns if it can make the full traversal
-safeFAtPath :: (Value -> Value) -> [Ix] -> Value -> Maybe Value
-safeFAtPath f (p:ps) = toLens p %%~ safeFAtPath f ps
-safeFAtPath f [] = Just . f
+--safeFAtPath :: (Foldable t, Applicative f) => (Value -> Value) -> t Ix -> Value -> f Value
+safeFAtPath f = foldr (traverseOf . toLens) (pure . f)
 
 -- |Only returns if it can make the full traversal
-safeAddAtPath :: [Ix] -> Value -> Value -> Maybe Value
-safeAddAtPath [p] v = Just . add v p
+safeAddAtPath :: Applicative f => [Ix] -> Value -> Value -> f Value
+safeAddAtPath [p] v = pure . add v p
 safeAddAtPath (p:ps) v = toLens p %%~ safeAddAtPath ps v
+safeAddAtPath [] v = pure . const v
 
 -- |Only returns if it can make the full traversal
-safeSetAtPath :: Value -> [Ix] -> Value -> Maybe Value
+safeSetAtPath :: Applicative f => Value -> [Ix] -> Value -> f Value
 safeSetAtPath v = safeFAtPath $ const v
 
+infixl 0 <$$>
+(<$$>) = (<$>)
+
 findAndDelete :: [Ix] -> Value -> Maybe (Value,Value)
-findAndDelete [p] o = do el <- o ^? toLens p
-                         return (el, remove p o)
-findAndDelete (p:ps) o = do s <- o ^? toLens p
-                            (_2 %~ setj p o) <$> findAndDelete ps s
+findAndDelete [p] o = (,remove p o) <$> o ^? toLens p
+findAndDelete (p:ps) o = _2 %~ setj p o <$$> o ^? toLens p >>= findAndDelete ps
 findAndDelete [] _ = Nothing
+
+deleteAtPath :: [Ix] -> Value -> Maybe Value
+deleteAtPath [p] = Just . remove p
+deleteAtPath (p:ps) = toLens p %%~ deleteAtPath ps
 
 -- |Applies a single JSON patch
 patch :: Operation -> Value -> Either String Value

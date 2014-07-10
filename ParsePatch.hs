@@ -39,7 +39,7 @@ parsePatchFile file = do
 
 -- |Parses any given ByteString, either returns a list of Operations or a String error message
 parsePatches :: BS.ByteString -> Either String [Operation]
-parsePatches str = case decode str >>= sequence . map patchToOp of
+parsePatches str = case decode str >>= mapM patchToOp of
   (Just p) -> Right p
   Nothing -> Left $ "Can't parse string: " <> BS.unpack str
 
